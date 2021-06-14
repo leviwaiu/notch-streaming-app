@@ -4,6 +4,7 @@
 package com.wearnotch.notchdemo;
 
 import android.Manifest;
+import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Context;
@@ -86,6 +87,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 
@@ -96,6 +98,8 @@ import butterknife.OnClick;
 
 import com.github.nkzawa.socketio.client.IO;
 import com.github.nkzawa.socketio.client.Socket;
+
+import javax.annotation.Nonnull;
 
 import static com.wearnotch.service.network.impl.b.m;
 
@@ -108,7 +112,7 @@ public class MainFragment extends BaseFragment {
     private static final long TIMED_CAPTURE_LENGTH = 2000L;
 
     private static final int REQUEST_ALL_PERMISSION = 1;
-    private static String[] PERMISSIONS = {Manifest.permission.WRITE_EXTERNAL_STORAGE, Manifest.permission.ACCESS_FINE_LOCATION};
+    private static final String[] PERMISSIONS = {Manifest.permission.WRITE_EXTERNAL_STORAGE, Manifest.permission.ACCESS_FINE_LOCATION};
 
     public static MainFragment newInstance() {
         return new MainFragment();
@@ -121,7 +125,7 @@ public class MainFragment extends BaseFragment {
     private String mUser;
     private boolean mRealTime, mChangingChannel;
     private VisualiserData mRealTimeData;
-    private Handler mHandler = new Handler(Looper.getMainLooper());
+    private final Handler mHandler = new Handler(Looper.getMainLooper());
     private SimpleDateFormat mSDF;
     private VisualiserActivity mVisualiserActivity;
     private Workout mWorkout;
@@ -129,13 +133,13 @@ public class MainFragment extends BaseFragment {
 
     private AnimationDrawable mDockAnimation;
 
-    private File mOutputDir = Environment.getExternalStoragePublicDirectory(NOTCH_DIR);
+    private final File mOutputDir = Environment.getExternalStoragePublicDirectory(NOTCH_DIR);
 
     private enum State {CALIBRATION, STEADY, CAPTURE}
 
     private State mState;
 
-    private int frameIndex = 1;
+    private final int frameIndex = 0;
 
 
 
@@ -258,7 +262,7 @@ public class MainFragment extends BaseFragment {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        mApplicationContext = getActivity().getApplicationContext();
+        mApplicationContext = Objects.requireNonNull(getActivity()).getApplicationContext();
         mActivity = getBaseActivity();
         mDB = NotchDataBase.getInst();
         VisualizerSettings.init(mApplicationContext);
@@ -269,6 +273,7 @@ public class MainFragment extends BaseFragment {
 
     }
 
+    @SuppressLint("SimpleDateFormat")
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
         View root = inflater.inflate(R.layout.fragment_main, container, false);
@@ -533,6 +538,7 @@ public class MainFragment extends BaseFragment {
     }
 
 
+    @SuppressLint("NonConstantResourceId")
     @OnClick(R.id.btn_configure_steady)
     void configureSteady() {
         // Display bone-notch configuration
@@ -556,24 +562,28 @@ public class MainFragment extends BaseFragment {
         });
     }
 
+    @SuppressLint("NonConstantResourceId")
     @OnClick(R.id.btn_steady)
     void steady() {
         mState = State.STEADY;
         mCountDown.start();
     }
 
+    @SuppressLint("NonConstantResourceId")
     @OnClick(R.id.btn_get_steady)
     void getSteadyData() {
         inProgress();
         mNotchService.getSteadyData(new EmptyCallback<Void>());
     }
 
+    @SuppressLint("NonConstantResourceId")
     @OnClick(R.id.btn_init_1_capture)
     void initCapture() {
         initSteady();
     }
 
 
+    @SuppressLint("NonConstantResourceId")
     @OnClick(R.id.btn_configure_capture)
     void configureCapture() {
         if (mRealTime) {
@@ -587,6 +597,7 @@ public class MainFragment extends BaseFragment {
 
     Cancellable c;
 
+    @SuppressLint("NonConstantResourceId")
     @OnClick(R.id.btn_capture)
     void cptr() {
         mState = State.CAPTURE;
@@ -602,21 +613,25 @@ public class MainFragment extends BaseFragment {
         fvec3 kneeAngleVector = new fvec3();
         fvec3 shoulderAngleVector = new fvec3();
         vData.calculateRelativeAngle(
-                skeleton.getBone("ChestBottom"),
+                Objects.requireNonNull(skeleton.getBone("ChestBottom")),
                 frameIndex, chestAngleVector);
         vData.calculateRelativeAngle(
-                skeleton.getBone("RightThigh"),
-                skeleton.getBone("RightLowerLeg"),
+                Objects.requireNonNull(skeleton.getBone("RightThigh")),
+                Objects.requireNonNull(skeleton.getBone("RightLowerLeg")),
                 frameIndex, kneeAngleVector);
-        vData.calculateRelativeAngle(skeleton.getBone("LeftCollar"),
-                skeleton.getBone("LeftUpperArm"),
+        vData.calculateRelativeAngle(Objects.requireNonNull(skeleton.getBone("LeftCollar")),
+                Objects.requireNonNull(skeleton.getBone("LeftUpperArm")),
                 frameIndex, shoulderAngleVector);
         ArrayList<Object> msgList = new ArrayList<Object>();
         msgList.add(String.valueOf(chestAngleVector.get(0)));
         msgList.add(String.valueOf(chestAngleVector.get(2)));
         msgList.add(String.valueOf(kneeAngleVector.get(0)));
         msgList.add(String.valueOf(shoulderAngleVector.get(0)));
-        moscService.sendOSCMessage(msgList);
+        try {
+            moscService.sendOSCMessage(msgList);
+        } catch(Exception e){
+            e.printStackTrace();
+        }
     }
 
 
@@ -634,20 +649,20 @@ public class MainFragment extends BaseFragment {
                         // ----------------- NEW FUNCTIONALITY ----------------
                         // Written by Lilly for BSc Project
                         mRealTimeData = (VisualiserData) progress.getObject();
+                        assert mRealTimeData != null;
                         sendData(mRealTimeData, frameIndex);
-                        frameIndex++;
 
                         //-------------------TEST MESSAGE---------------
-                        ArrayList<Object> testMsgList = new ArrayList<Object>();
-                        testMsgList.add("0.142");
-                        testMsgList.add("10.2");
-                        testMsgList.add("2.5");
-                        testMsgList.add("0.001");
-                        try {
-                            moscService.sendOSCMessage(testMsgList);
-                        } catch (Exception e) {
-                            e.printStackTrace();
-                        }
+//                        ArrayList<Object> testMsgList = new ArrayList<Object>();
+//                        testMsgList.add("0.142");
+//                        testMsgList.add("10.2");
+//                        testMsgList.add("2.5");
+//                        testMsgList.add("0.001");
+//                        try {
+//                            moscService.sendOSCMessage(testMsgList);
+//                        } catch (Exception e) {
+//                            e.printStackTrace();
+//                        }
                         updateRealTime();
                     }
                 }
@@ -659,7 +674,7 @@ public class MainFragment extends BaseFragment {
                 }
 
                 @Override
-                public void onFailure(NotchError notchError) {
+                public void onFailure(@Nonnull NotchError notchError) {
                     System.out.println("In Failure Mode");
                     Util.showNotification(Util.getNotchErrorStr(notchError));
                     clearText();
@@ -785,10 +800,7 @@ public class MainFragment extends BaseFragment {
                 InputStream stream = new FileInputStream(fileToDownload);
                 in = new ObjectInputStream(stream);
                 mCurrentMeasurement = (Measurement) in.readObject();
-            } catch (IOException | ClassNotFoundException e) {
-                Util.showNotification("Not supported measurement format!");
-                return;
-            } catch (IllegalArgumentException e) {
+            } catch (IOException | ClassNotFoundException | IllegalArgumentException e) {
                 Util.showNotification("Not supported measurement format!");
                 return;
             }
@@ -1030,7 +1042,7 @@ public class MainFragment extends BaseFragment {
         }
     }
 
-    private CountDownTimer mCountDown = new CountDownTimer(3250, 500) {
+    private final CountDownTimer mCountDown = new CountDownTimer(3250, 500) {
         public void onTick(long millisUntilFinished) {
             //update the UI with the new count
             setCounterText(mCounterText, millisUntilFinished);
@@ -1074,7 +1086,8 @@ public class MainFragment extends BaseFragment {
 
     private void setCounterText(final TextView text, final long millisec) {
         if (isAdded()) {
-            getActivity().runOnUiThread(new Runnable() {
+            Objects.requireNonNull(getActivity()).runOnUiThread(new Runnable() {
+                @SuppressLint("SetTextI18n")
                 @Override
                 public void run() {
                     text.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 120);
@@ -1086,7 +1099,7 @@ public class MainFragment extends BaseFragment {
 
     private void setCounterText(final TextView text, final String str, final float size) {
         if (isAdded()) {
-            getActivity().runOnUiThread(new Runnable() {
+            Objects.requireNonNull(getActivity()).runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
                     text.setTextSize(TypedValue.COMPLEX_UNIT_DIP, size);
